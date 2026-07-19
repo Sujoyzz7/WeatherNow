@@ -225,9 +225,66 @@ async function fetchForecastByCoords(lat, lon) {
 }
 
 /**
+ * Fetches air quality data for given coordinates.
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @returns {Promise<object|null>} Air quality data or null on failure
+ */
+async function fetchAirQuality(lat, lon) {
+    const url = `${API_CONFIG.BASE_URL}/air_pollution?lat=${lat}&lon=${lon}&appid=${API_CONFIG.KEY}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.json();
+        return processAirQuality(data);
+    } catch (error) {
+        console.warn('Failed to fetch air quality:', error);
+        return null;
+    }
+}
+
+/**
+ * Processes raw air pollution API response into a clean object.
+ * @param {object} data - Raw API response
+ * @returns {object} Processed air quality data
+ */
+function processAirQuality(data) {
+    const item = data.list[0];
+    const aqi = item.main.aqi;
+    const components = item.components;
+
+    const labels = {
+        1: { label: 'Good', color: '#10B981', icon: '😊' },
+        2: { label: 'Fair', color: '#F59E0B', icon: '🙂' },
+        3: { label: 'Moderate', color: '#F97316', icon: '😐' },
+        4: { label: 'Poor', color: '#EF4444', icon: '😷' },
+        5: { label: 'Very Poor', color: '#8B5CF6', icon: '🤢' }
+    };
+
+    return {
+        aqi,
+        label: labels[aqi]?.label || 'Unknown',
+        color: labels[aqi]?.color || '#9CA3AF',
+        icon: labels[aqi]?.icon || '❓',
+        components: {
+            co: components.co.toFixed(1),
+            no: components.no.toFixed(2),
+            no2: components.no2.toFixed(1),
+            o3: components.o3.toFixed(1),
+            so2: components.so2.toFixed(1),
+            pm2_5: components.pm2_5.toFixed(1),
+            pm10: components.pm10.toFixed(1),
+            nh3: components.nh3.toFixed(2)
+        }
+    };
+}
+
+/**
  * Fetches both current weather and forecast for a city in parallel.
+ * Also fetches air quality data using coordinates from the weather response.
  * @param {string} city - City name
- * @returns {Promise<{current: object, forecast: Array, hourly: Array}>}
+ * @returns {Promise<{current: object, forecast: Array, hourly: Array, airQuality: object|null}>}
  */
 async function fetchWeatherData(city) {
     const [current, forecast] = await Promise.all([
@@ -235,29 +292,39 @@ async function fetchWeatherData(city) {
         fetchForecast(city)
     ]);
 
+    // Fetch air quality using coordinates from current weather
+    let airQuality = null;
+    if (current.lat && current.lon) {
+        airQuality = await fetchAirQuality(current.lat, current.lon);
+    }
+
     return {
         current,
         forecast: forecast.daily,
-        hourly: forecast.hourly
+        hourly: forecast.hourly,
+        airQuality
     };
 }
 
 /**
  * Fetches both current weather and forecast using coordinates in parallel.
+ * Also fetches air quality data.
  * @param {number} lat - Latitude
  * @param {number} lon - Longitude
- * @returns {Promise<{current: object, forecast: Array, hourly: Array}>}
+ * @returns {Promise<{current: object, forecast: Array, hourly: Array, airQuality: object|null}>}
  */
 async function fetchWeatherDataByCoords(lat, lon) {
-    const [current, forecast] = await Promise.all([
+    const [current, forecast, airQuality] = await Promise.all([
         fetchWeatherByCoords(lat, lon),
-        fetchForecastByCoords(lat, lon)
+        fetchForecastByCoords(lat, lon),
+        fetchAirQuality(lat, lon)
     ]);
 
     return {
         current,
         forecast: forecast.daily,
-        hourly: forecast.hourly
+        hourly: forecast.hourly,
+        airQuality
     };
 }
 
@@ -274,6 +341,8 @@ function processCurrentWeather(data) {
     const condition = getWeatherCondition(data.weather[0].icon);
 
     return {
+        lat: data.coord.lat,
+        lon: data.coord.lon,
         city: data.name,
         country: data.sys.country,
         temp: Math.round(data.main.temp),

@@ -30,7 +30,8 @@ const UI = {
             recentList: document.getElementById('recent-list'),
             emptyState: document.getElementById('empty-state'),
             themeToggle: document.getElementById('theme-toggle'),
-            locationBtn: document.getElementById('location-btn')
+            locationBtn: document.getElementById('location-btn'),
+            airQuality: document.getElementById('air-quality')
         };
     }
 };
@@ -127,6 +128,7 @@ function renderWeatherData(weatherData, unit) {
     // Render each section
     renderCurrentWeather(weatherData.current, unit);
     renderHourlyForecast(weatherData.hourly, unit);
+    renderAirQuality(weatherData.airQuality);
     renderForecast(weatherData.forecast, unit);
 
     // Show the weather display with animation
@@ -252,7 +254,7 @@ function renderCurrentWeather(data, unit) {
             </div>
 
             <!-- Weather condition animation elements -->
-            ${getWeatherAnimationHTML(data.animation)}
+            ${getWeatherAnimationHTML(data.animation, data.isNight)}
         </div>
     `;
 
@@ -360,6 +362,76 @@ function renderForecast(data, unit) {
             ${cardsHtml}
         </div>
     `;
+}
+
+// ============================================
+// AIR QUALITY
+// ============================================
+
+/**
+ * Renders the Air Quality Index section with color-coded gauge and components.
+ * @param {object|null} data - Air quality data object or null
+ */
+function renderAirQuality(data) {
+    const { airQuality } = UI.elements;
+
+    if (!data) {
+        airQuality.hidden = true;
+        return;
+    }
+
+    const { aqi, label, color, icon, components } = data;
+
+    // Calculate the gauge percentage (AQI 1-5 mapped to 0-100%)
+    const gaugePercent = ((aqi - 1) / 4) * 100;
+
+    const componentLabels = [
+        { key: 'pm2_5', label: 'PM2.5', unit: 'µg/m³' },
+        { key: 'pm10', label: 'PM10', unit: 'µg/m³' },
+        { key: 'o3', label: 'O₃', unit: 'µg/m³' },
+        { key: 'no2', label: 'NO₂', unit: 'µg/m³' },
+        { key: 'so2', label: 'SO₂', unit: 'µg/m³' },
+        { key: 'co', label: 'CO', unit: 'µg/m³' }
+    ];
+
+    const componentsHtml = componentLabels.map(c => `
+        <div class="aqi-component">
+            <span class="aqi-component__label">${c.label}</span>
+            <span class="aqi-component__value">${components[c.key]} <span class="aqi-component__unit">${c.unit}</span></span>
+        </div>
+    `).join('');
+
+    airQuality.innerHTML = `
+        <div class="aqi-card">
+            <div class="section-title">Air Quality Index</div>
+            <div class="aqi-card__body">
+                <div class="aqi-gauge">
+                    <div class="aqi-gauge__bg">
+                        <div class="aqi-gauge__fill" style="width: ${gaugePercent}%; background: ${color};"></div>
+                    </div>
+                    <div class="aqi-gauge__labels">
+                        <span>Good</span>
+                        <span>Fair</span>
+                        <span>Moderate</span>
+                        <span>Poor</span>
+                        <span>Very Poor</span>
+                    </div>
+                </div>
+                <div class="aqi-badge" style="background: ${color}20; color: ${color}; border-color: ${color}40;">
+                    <span class="aqi-badge__icon">${icon}</span>
+                    <div class="aqi-badge__info">
+                        <span class="aqi-badge__value">${aqi}</span>
+                        <span class="aqi-badge__label">${label}</span>
+                    </div>
+                </div>
+                <div class="aqi-components">
+                    ${componentsHtml}
+                </div>
+            </div>
+        </div>
+    `;
+
+    airQuality.hidden = false;
 }
 
 // ============================================
@@ -480,34 +552,104 @@ function formatTimeByOffset(timestamp, timezoneOffset) {
 }
 
 /**
- * Generates HTML for weather condition CSS animations.
- * @param {string} animationType - Type of animation ('clear', 'rain', 'snow', 'clouds', 'thunder')
+ * Generates HTML for rich weather condition CSS animations.
+ * Each condition produces multiple layered, depth-rich animation elements.
+ * @param {string} animationType - Type of animation ('clear', 'rain', 'snow', 'clouds', 'thunder', 'mist')
+ * @param {boolean} isNight - Whether it's night time
  * @returns {string} HTML for animation elements
  */
-function getWeatherAnimationHTML(animationType) {
+function getWeatherAnimationHTML(animationType, isNight = false) {
     switch (animationType) {
+        // ======================== SUNNY / CLEAR ========================
         case 'clear':
-            return '<div class="sun-animation" aria-hidden="true"></div>';
+            if (isNight) {
+                // Night sky: moon + stars
+                const stars = Array.from({ length: 18 }, () => {
+                    const size = 1.5 + Math.random() * 2.5;
+                    const delay = (Math.random() * 4).toFixed(2);
+                    const duration = (1.5 + Math.random() * 2).toFixed(2);
+                    return `<div class="night-star" aria-hidden="true" style="left: ${Math.random() * 95}%; top: ${5 + Math.random() * 55}%; width: ${size}px; height: ${size}px; animation-delay: ${delay}s; animation-duration: ${duration}s;"></div>`;
+                }).join('');
+                return `<div class="moon-animation" aria-hidden="true"></div>${stars}`;
+            }
+            // Day: sun + rays + sparkles
+            const sparkles = Array.from({ length: 8 }, () => {
+                const delay = (Math.random() * 5).toFixed(2);
+                return `<div class="sun-sparkle" aria-hidden="true" style="left: ${10 + Math.random() * 80}%; top: ${10 + Math.random() * 70}%; animation-delay: ${delay}s;"></div>`;
+            }).join('');
+            return `<div class="sun-animation" aria-hidden="true"></div><div class="sun-rays" aria-hidden="true"></div>${sparkles}`;
+
+        // ======================== RAIN ========================
         case 'rain':
-            return Array.from({ length: 8 }, () =>
-                `<div class="rain-drop" aria-hidden="true" style="left: ${Math.random() * 100}%; animation-delay: ${(Math.random() * 2).toFixed(2)}s; animation-duration: ${(0.8 + Math.random() * 0.6).toFixed(2)}s; height: ${15 + Math.random() * 20}px;"></div>`
-            ).join('');
+            const rainDrops = Array.from({ length: 25 }, () => {
+                const delay = (Math.random() * 2).toFixed(2);
+                const duration = (0.6 + Math.random() * 0.5).toFixed(2);
+                const height = 12 + Math.random() * 22;
+                const left = Math.random() * 100;
+                const opacity = 0.3 + Math.random() * 0.4;
+                return `<div class="rain-drop" aria-hidden="true" style="left: ${left}%; animation-delay: ${delay}s; animation-duration: ${duration}s; height: ${height}px; opacity: ${opacity};"></div>`;
+            }).join('');
+            const splashes = Array.from({ length: 5 }, () => {
+                const delay = (Math.random() * 2).toFixed(2);
+                return `<div class="rain-splash" aria-hidden="true" style="left: ${Math.random() * 90 + 5}%; animation-delay: ${delay}s;"></div>`;
+            }).join('');
+            return `<div class="rain-overlay" aria-hidden="true"></div>${rainDrops}${splashes}`;
+
+        // ======================== SNOW ========================
         case 'snow':
-            return Array.from({ length: 12 }, () =>
-                `<div class="snow-flake" aria-hidden="true" style="left: ${Math.random() * 100}%; animation-delay: ${(Math.random() * 3).toFixed(2)}s; animation-duration: ${(2 + Math.random() * 2).toFixed(2)}s; width: ${4 + Math.random() * 4}px; height: ${4 + Math.random() * 4}px;"></div>`
-            ).join('');
+            const snowFlakes = Array.from({ length: 25 }, () => {
+                const delay = (Math.random() * 5).toFixed(2);
+                const duration = (3 + Math.random() * 4).toFixed(2);
+                const size = 3 + Math.random() * 7;
+                const left = Math.random() * 100;
+                const drift = (50 + Math.random() * 100).toFixed(0);
+                return `<div class="snow-flake" aria-hidden="true" style="left: ${left}%; width: ${size}px; height: ${size}px; animation-delay: ${delay}s; animation-duration: ${duration}s; --drift: ${drift}px;"></div>`;
+            }).join('');
+            return `<div class="snow-overlay" aria-hidden="true"></div>${snowFlakes}`;
+
+        // ======================== CLOUDS ========================
         case 'clouds':
             return `
-                <div class="cloud-float" aria-hidden="true" style="top: 10%; left: 10%; animation-delay: 0s;"></div>
-                <div class="cloud-float" aria-hidden="true" style="top: 30%; right: 15%; animation-delay: -3s; width: 80px; height: 30px;"></div>
+                <div class="cloud-layer cloud-layer--back" aria-hidden="true">
+                    <div class="cloud-float" aria-hidden="true" style="top: 5%; left: 5%; animation-delay: 0s; animation-duration: 20s; width: 130px; height: 44px;"></div>
+                    <div class="cloud-float" aria-hidden="true" style="top: 18%; right: 8%; animation-delay: -7s; animation-duration: 25s; width: 110px; height: 38px;"></div>
+                </div>
+                <div class="cloud-layer cloud-layer--mid" aria-hidden="true">
+                    <div class="cloud-float" aria-hidden="true" style="top: 10%; left: 30%; animation-delay: -3s; animation-duration: 16s; width: 100px; height: 36px; opacity: 0.7;"></div>
+                    <div class="cloud-float" aria-hidden="true" style="top: 25%; right: 20%; animation-delay: -5s; animation-duration: 18s; width: 90px; height: 32px; opacity: 0.6;"></div>
+                </div>
+                <div class="cloud-layer cloud-layer--front" aria-hidden="true">
+                    <div class="cloud-float" aria-hidden="true" style="top: 15%; left: 55%; animation-delay: -2s; animation-duration: 12s; width: 80px; height: 28px; opacity: 0.8;"></div>
+                </div>
             `;
+
+        // ======================== THUNDER / STORM ========================
         case 'thunder':
+            const stormDrops = Array.from({ length: 30 }, () => {
+                const delay = (Math.random() * 2).toFixed(2);
+                const duration = (0.4 + Math.random() * 0.3).toFixed(2);
+                const height = 18 + Math.random() * 28;
+                const left = Math.random() * 100;
+                return `<div class="rain-drop rain-drop--storm" aria-hidden="true" style="left: ${left}%; animation-delay: ${delay}s; animation-duration: ${duration}s; height: ${height}px;"></div>`;
+            }).join('');
+            const stormSplashes = Array.from({ length: 4 }, () => {
+                const delay = (Math.random() * 2).toFixed(2);
+                return `<div class="rain-splash rain-splash--storm" aria-hidden="true" style="left: ${Math.random() * 90 + 5}%; animation-delay: ${delay}s;"></div>`;
+            }).join('');
             return `
+                <div class="storm-overlay" aria-hidden="true"></div>
                 <div class="thunder-flash" aria-hidden="true"></div>
-                ${Array.from({ length: 6 }, () =>
-                    `<div class="rain-drop" aria-hidden="true" style="left: ${Math.random() * 100}%; animation-delay: ${(Math.random() * 2).toFixed(2)}s; animation-duration: ${(0.6 + Math.random() * 0.4).toFixed(2)}s; height: ${15 + Math.random() * 20}px;"></div>`
-                ).join('')}
+                ${stormDrops}${stormSplashes}
             `;
+
+        // ======================== MIST / FOG ========================
+        case 'mist':
+            return `
+                <div class="fog-layer" aria-hidden="true" style="top: 10%; animation-delay: 0s; animation-duration: 20s;"></div>
+                <div class="fog-layer" aria-hidden="true" style="top: 35%; animation-delay: -7s; animation-duration: 28s; opacity: 0.5;"></div>
+                <div class="fog-layer" aria-hidden="true" style="top: 55%; animation-delay: -14s; animation-duration: 24s; opacity: 0.3;"></div>
+            `;
+
         default:
             return '';
     }
