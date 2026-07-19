@@ -541,18 +541,230 @@ input:focus-visible {
 }
 
 /* ============================================================
-   LOADING STATE
+   LOADING SKELETON (Shimmer)
    ============================================================ */
 
 .loading {
+    animation: fadeIn 300ms ease forwards;
+}
+
+/* Shimmer keyframe — a moving gradient sweep */
+@keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+/* Shared shimmer gradient for light & dark themes */
+:root {
+    --skeleton-base: #E5E7EB;
+    --skeleton-shine: #F3F4F6;
+    --skeleton-radius: var(--radius-md);
+}
+
+[data-theme="dark"] {
+    --skeleton-base: #2D2D4A;
+    --skeleton-shine: #3A3A5C;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, var(--skeleton-base) 30%, var(--skeleton-shine) 50%, var(--skeleton-base) 70%);
+    background-size: 400px 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    border-radius: var(--skeleton-radius);
+    color: transparent !important;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* --- Current Weather Skeleton --- */
+.skeleton-current {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-xl);
+    padding: var(--space-2xl) var(--space-xl);
+    border: 1px solid var(--color-border);
+}
+
+.skeleton-current__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-lg);
+}
+
+.skeleton-current__location {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.skeleton-current__city {
+    width: 180px;
+    height: 28px;
+}
+
+.skeleton-current__datetime {
+    width: 260px;
+    height: 14px;
+}
+
+.skeleton-current__unit-toggle {
+    width: 80px;
+    height: 32px;
+}
+
+.skeleton-current__body {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xl);
+    margin-bottom: var(--space-xl);
+}
+
+.skeleton-current__icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-current__temp-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.skeleton-current__temp {
+    width: 140px;
+    height: 56px;
+}
+
+.skeleton-current__condition {
+    width: 100px;
+    height: 18px;
+}
+
+.skeleton-current__details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+.skeleton-current__detail-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+}
+
+.skeleton-current__detail-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.skeleton-current__detail-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.skeleton-current__detail-label {
+    width: 60%;
+    height: 12px;
+}
+
+.skeleton-current__detail-value {
+    width: 80%;
+    height: 16px;
+}
+
+/* --- Hourly Forecast Skeleton --- */
+.skeleton-hourly {
+    display: flex;
+    gap: var(--space-sm);
+    overflow: hidden;
+    padding: var(--space-sm) 0;
+}
+
+.skeleton-hourly__card {
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: var(--space-lg);
-    padding: var(--space-3xl) 0;
-    animation: fadeIn 300ms ease forwards;
+    gap: 10px;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    min-width: 90px;
 }
+
+.skeleton-hourly__time {
+    width: 40px;
+    height: 14px;
+}
+
+.skeleton-hourly__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.skeleton-hourly__temp {
+    width: 48px;
+    height: 18px;
+}
+
+/* --- 5-Day Forecast Skeleton --- */
+.skeleton-forecast {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-md);
+}
+
+.skeleton-forecast__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: var(--space-lg) var(--space-md);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.skeleton-forecast__day {
+    width: 60px;
+    height: 16px;
+}
+
+.skeleton-forecast__date {
+    width: 50px;
+    height: 12px;
+}
+
+.skeleton-forecast__icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+}
+
+.skeleton-forecast__condition {
+    width: 70px;
+    height: 14px;
+}
+
+.skeleton-forecast__temps {
+    width: 90px;
+    height: 16px;
+}
+
+/* ============================================================
+   LOADING SPINNER (fallback)
+   ============================================================ */
 
 .loading__spinner {
     display: flex;
@@ -813,7 +1025,7 @@ input:focus-visible {
 }
 
 /* ============================================================
-   HOURLY FORECAST
+   HOURLY FORECAST (with draggable scrollbar)
    ============================================================ */
 
 .hourly-forecast {
@@ -827,30 +1039,131 @@ input:focus-visible {
     margin-bottom: var(--space-md);
 }
 
+/* --- Scroll Wrapper --- */
+.hourly-forecast__scroll-wrapper {
+    position: relative;
+}
+
+/* --- Navigation Arrows --- */
+.hourly-forecast__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-md);
+}
+
+.hourly-forecast__scroll-wrapper:hover .hourly-forecast__nav,
+.hourly-forecast__nav:focus-visible {
+    opacity: 1;
+}
+
+.hourly-forecast__nav:hover {
+    background: var(--color-primary);
+    color: #FFFFFF;
+    border-color: var(--color-primary);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.hourly-forecast__nav:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.hourly-forecast__nav--prev {
+    left: -6px;
+}
+
+.hourly-forecast__nav--next {
+    right: -6px;
+}
+
+/* --- Scroll Container (drag-to-scroll + snap) --- */
 .hourly-forecast__scroll {
     display: flex;
     gap: var(--space-sm);
     overflow-x: auto;
-    padding: var(--space-sm) 0 var(--space-md);
+    padding: var(--space-sm) 0 var(--space-sm);
     scroll-snap-type: x mandatory;
+    scroll-snap-stop: normal;
+    scroll-padding: 0 var(--space-lg);
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    scrollbar-width: none;
 }
 
 .hourly-forecast__scroll::-webkit-scrollbar {
-    height: 4px;
+    display: none;
 }
 
-.hourly-forecast__scroll::-webkit-scrollbar-track {
-    background: transparent;
+.hourly-forecast__scroll--dragging {
+    cursor: grabbing;
+    scroll-snap-type: none;
 }
 
-.hourly-forecast__scroll::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+/* --- Custom Draggable Scrollbar --- */
+.hourly-forecast__scrollbar {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    margin-top: var(--space-sm);
+    background: var(--color-bg-input);
     border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: height var(--transition-fast);
 }
 
+.hourly-forecast__scrollbar:hover {
+    height: 8px;
+}
+
+.hourly-forecast__scrollbar-track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.hourly-forecast__scrollbar-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    min-width: 40px;
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+    cursor: grab;
+    transition: width 200ms ease, background var(--transition-fast);
+    box-shadow: 0 0 6px rgba(33, 150, 243, 0.3);
+}
+
+.hourly-forecast__scrollbar-thumb:hover {
+    background: var(--color-primary-dark);
+}
+
+.hourly-forecast__scrollbar-thumb--dragging {
+    cursor: grabbing;
+    background: var(--color-primary-dark);
+}
+
+/* --- Hourly Cards --- */
 .hourly-card {
     flex-shrink: 0;
     scroll-snap-align: start;
@@ -864,6 +1177,7 @@ input:focus-visible {
     border: 1px solid var(--color-border);
     min-width: 90px;
     transition: all var(--transition-fast);
+    pointer-events: auto;
 }
 
 .hourly-card:hover {
@@ -1840,6 +2154,9 @@ input:focus-visible {
     }
 
     /* Hourly */
+    .hourly-forecast__nav {
+        display: none;
+    }
     .hourly-card {
         min-width: 80px;
         padding: var(--space-sm) var(--space-md);
@@ -1852,6 +2169,10 @@ input:focus-visible {
 
     .hourly-card__temp {
         font-size: 15px;
+    }
+
+    .hourly-forecast__scrollbar {
+        height: 5px;
     }
 
     /* Empty State */
@@ -1871,6 +2192,29 @@ input:focus-visible {
     .footer {
         margin-top: var(--space-xl);
         padding: var(--space-md) 0;
+    }
+
+    /* Skeleton responsive */
+    .skeleton-current__details {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .skeleton-forecast {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .skeleton-current__body {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .skeleton-current__temp-block {
+        align-items: center;
+    }
+
+    .skeleton-current__city {
+        width: 140px;
     }
 
     /* Weather card background effects smaller */
@@ -2121,6 +2465,35 @@ input:focus-visible {
         flex-shrink: 0;
     }
 
+    /* Skeleton responsive */
+    .skeleton-current__details {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-sm);
+    }
+
+    .skeleton-current__detail-item {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .skeleton-forecast {
+        grid-template-columns: 1fr;
+    }
+
+    .skeleton-forecast__card {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .skeleton-hourly__card {
+        min-width: 68px;
+        padding: var(--space-sm) 10px;
+    }
+
     /* Hourly */
     .hourly-forecast__scroll {
         gap: 6px;
@@ -2131,6 +2504,14 @@ input:focus-visible {
         min-width: 68px;
         padding: var(--space-sm) 10px;
         gap: 4px;
+    }
+
+    .hourly-forecast__scrollbar {
+        height: 4px;
+    }
+
+    .hourly-forecast__scrollbar-thumb {
+        min-width: 30px;
     }
 
     .hourly-card__time {
@@ -2265,6 +2646,14 @@ input:focus-visible {
     .hourly-card {
         min-width: 60px;
         padding: var(--space-xs) 8px;
+    }
+
+    .hourly-forecast__scrollbar {
+        height: 3px;
+    }
+
+    .hourly-forecast__scrollbar-thumb {
+        min-width: 24px;
     }
 
     .hourly-card__time {

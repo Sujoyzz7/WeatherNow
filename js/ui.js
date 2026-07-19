@@ -49,7 +49,8 @@ let currentHourlyData = null;
 // ============================================
 
 /**
- * Shows the loading spinner and hides other sections.
+ * Shows skeleton shimmer placeholders for current weather, hourly, and forecast.
+ * Hides other sections.
  */
 function showLoading() {
     const { loading, weatherDisplay, emptyState, errorMessage } = UI.elements;
@@ -57,6 +58,65 @@ function showLoading() {
     hideError();
     emptyState.hidden = true;
     weatherDisplay.hidden = true;
+
+    // Render rich skeleton placeholders that match real content layout
+    loading.innerHTML = `
+        <!-- Current Weather Skeleton -->
+        <div class="skeleton-current" aria-hidden="true">
+            <div class="skeleton-current__header">
+                <div class="skeleton-current__location">
+                    <div class="skeleton skeleton-current__city">&nbsp;</div>
+                    <div class="skeleton skeleton-current__datetime">&nbsp;</div>
+                </div>
+                <div class="skeleton skeleton-current__unit-toggle">&nbsp;</div>
+            </div>
+            <div class="skeleton-current__body">
+                <div class="skeleton skeleton-current__icon">&nbsp;</div>
+                <div class="skeleton-current__temp-block">
+                    <div class="skeleton skeleton-current__temp">&nbsp;</div>
+                    <div class="skeleton skeleton-current__condition">&nbsp;</div>
+                </div>
+            </div>
+            <div class="skeleton-current__details">
+                ${Array.from({ length: 6 }, () => `
+                    <div class="skeleton-current__detail-item">
+                        <div class="skeleton skeleton-current__detail-icon">&nbsp;</div>
+                        <div class="skeleton-current__detail-info">
+                            <div class="skeleton skeleton-current__detail-label">&nbsp;</div>
+                            <div class="skeleton skeleton-current__detail-value">&nbsp;</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- Hourly Forecast Skeleton -->
+        <div class="section-title">Hourly Forecast</div>
+        <div class="skeleton-hourly" aria-hidden="true">
+            ${Array.from({ length: 6 }, () => `
+                <div class="skeleton-hourly__card">
+                    <div class="skeleton skeleton-hourly__time">&nbsp;</div>
+                    <div class="skeleton skeleton-hourly__icon">&nbsp;</div>
+                    <div class="skeleton skeleton-hourly__temp">&nbsp;</div>
+                </div>
+            `).join('')}
+        </div>
+
+        <!-- 5-Day Forecast Skeleton -->
+        <div class="section-title">5-Day Forecast</div>
+        <div class="skeleton-forecast" aria-hidden="true">
+            ${Array.from({ length: 5 }, () => `
+                <div class="skeleton-forecast__card">
+                    <div class="skeleton skeleton-forecast__day">&nbsp;</div>
+                    <div class="skeleton skeleton-forecast__date">&nbsp;</div>
+                    <div class="skeleton skeleton-forecast__icon">&nbsp;</div>
+                    <div class="skeleton skeleton-forecast__condition">&nbsp;</div>
+                    <div class="skeleton skeleton-forecast__temps">&nbsp;</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
     loading.hidden = false;
 }
 
@@ -275,7 +335,7 @@ function renderCurrentWeather(data, unit) {
 // ============================================
 
 /**
- * Renders the hourly forecast section.
+ * Renders the hourly forecast section with drag-to-scroll and custom scrollbar.
  * @param {Array} data - Array of hourly forecast objects (up to 8)
  * @param {string} unit - 'C' or 'F'
  */
@@ -308,12 +368,220 @@ function renderHourlyForecast(data, unit) {
 
     hourlyForecast.innerHTML = `
         <div class="section-title">Hourly Forecast</div>
-        <div class="hourly-forecast__scroll">
-            ${cardsHtml}
+        <div class="hourly-forecast__scroll-wrapper">
+            <button class="hourly-forecast__nav hourly-forecast__nav--prev" aria-label="Scroll hourly forecast left" title="Previous hours">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+            </button>
+            <button class="hourly-forecast__nav hourly-forecast__nav--next" aria-label="Scroll hourly forecast right" title="Next hours">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6"/>
+                </svg>
+            </button>
+            <div class="hourly-forecast__scroll" id="hourly-scroll" role="listbox" aria-label="Hourly forecast">
+                ${cardsHtml}
+            </div>
+            <div class="hourly-forecast__scrollbar" aria-hidden="true">
+                <div class="hourly-forecast__scrollbar-track">
+                    <div class="hourly-forecast__scrollbar-thumb"></div>
+                </div>
+            </div>
         </div>
     `;
 
     hourlyForecast.hidden = false;
+
+    // Initialize advanced scroll behaviors after rendering
+    initHourlyScroll();
+}
+
+/**
+ * Initializes drag-to-scroll, custom scrollbar, and nav buttons for the hourly forecast.
+ * Uses an AbortController so that window-level listeners can be cleaned up on re-render.
+ */
+function initHourlyScroll() {
+    const scrollContainer = document.getElementById('hourly-scroll');
+    if (!scrollContainer) return;
+
+    // Abort previous controller if this function runs again (e.g. on unit toggle)
+    if (window.__hourlyScrollController) {
+        window.__hourlyScrollController.abort();
+    }
+    const controller = new AbortController();
+    window.__hourlyScrollController = controller;
+    const { signal } = controller;
+
+    const wrapper = scrollContainer.closest('.hourly-forecast__scroll-wrapper');
+    const thumb = wrapper.querySelector('.hourly-forecast__scrollbar-thumb');
+    const track = wrapper.querySelector('.hourly-forecast__scrollbar-track');
+    const prevBtn = wrapper.querySelector('.hourly-forecast__nav--prev');
+    const nextBtn = wrapper.querySelector('.hourly-forecast__nav--next');
+
+    // --- Helper: Update scrollbar thumb position/size ---
+    function updateScrollbar() {
+        const scrollLeft = scrollContainer.scrollLeft;
+        const scrollWidth = scrollContainer.scrollWidth;
+        const clientWidth = scrollContainer.clientWidth;
+        const maxScroll = scrollWidth - clientWidth;
+
+        if (maxScroll <= 0) {
+            thumb.style.width = '100%';
+            thumb.style.left = '0';
+            return;
+        }
+
+        const thumbWidth = Math.max(40, (clientWidth / scrollWidth) * track.clientWidth);
+        const thumbLeft = (scrollLeft / maxScroll) * (track.clientWidth - thumbWidth);
+
+        thumb.style.width = `${thumbWidth}px`;
+        thumb.style.left = `${thumbLeft}px`;
+
+        // Toggle nav button visibility based on scroll position
+        if (prevBtn) {
+            prevBtn.style.opacity = scrollLeft <= 5 ? '0' : '';
+            prevBtn.style.pointerEvents = scrollLeft <= 5 ? 'none' : 'auto';
+        }
+        if (nextBtn) {
+            const atEnd = scrollLeft + clientWidth >= scrollWidth - 5;
+            nextBtn.style.opacity = atEnd ? '0' : '';
+            nextBtn.style.pointerEvents = atEnd ? 'none' : 'auto';
+        }
+    }
+
+    // Initial update
+    requestAnimationFrame(updateScrollbar);
+
+    // --- Update on scroll ---
+    scrollContainer.addEventListener('scroll', updateScrollbar, { passive: true, signal });
+
+    // --- Resize observer to keep scrollbar in sync ---
+    const resizeObserver = new ResizeObserver(() => updateScrollbar());
+    resizeObserver.observe(scrollContainer);
+    // Disconnect observer when this controller is aborted
+    signal.addEventListener('abort', () => resizeObserver.disconnect(), { once: true });
+
+    // --- Drag-to-scroll (mouse) ---
+    let isDragging = false;
+    let startX = 0;
+    let scrollStart = 0;
+
+    function onDragStart(e) {
+        isDragging = true;
+        startX = e.pageX;
+        scrollStart = scrollContainer.scrollLeft;
+        scrollContainer.classList.add('hourly-forecast__scroll--dragging');
+        scrollContainer.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+    }
+
+    function onDragMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX;
+        const walk = (x - startX) * 1.2;
+        scrollContainer.scrollLeft = scrollStart - walk;
+    }
+
+    function onDragEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+        scrollContainer.classList.remove('hourly-forecast__scroll--dragging');
+        scrollContainer.style.cursor = '';
+        document.body.style.userSelect = '';
+    }
+
+    scrollContainer.addEventListener('mousedown', onDragStart, { signal });
+    window.addEventListener('mousemove', onDragMove, { signal });
+    window.addEventListener('mouseup', onDragEnd, { signal });
+
+    // --- Draggable custom scrollbar thumb ---
+    let isThumbDragging = false;
+    let thumbStartX = 0;
+    let thumbScrollStart = 0;
+
+    function onThumbDown(e) {
+        const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+        if (maxScroll <= 0) return; // Nothing to scroll
+        e.stopPropagation();
+        isThumbDragging = true;
+        thumbStartX = e.pageX;
+        thumbScrollStart = scrollContainer.scrollLeft;
+        thumb.classList.add('hourly-forecast__scrollbar-thumb--dragging');
+        document.body.style.userSelect = 'none';
+    }
+
+    function onThumbMove(e) {
+        if (!isThumbDragging) return;
+        e.preventDefault();
+        const dx = e.pageX - thumbStartX;
+        const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+        const trackWidth = track.clientWidth;
+        const thumbWidth = parseFloat(thumb.style.width) || 40;
+        const scrollRatio = maxScroll / (trackWidth - thumbWidth);
+        scrollContainer.scrollLeft = thumbScrollStart + dx * scrollRatio;
+    }
+
+    function onThumbUp() {
+        if (!isThumbDragging) return;
+        isThumbDragging = false;
+        thumb.classList.remove('hourly-forecast__scrollbar-thumb--dragging');
+        document.body.style.userSelect = '';
+    }
+
+    thumb.addEventListener('mousedown', onThumbDown, { signal });
+    window.addEventListener('mousemove', onThumbMove, { signal });
+    window.addEventListener('mouseup', onThumbUp, { signal });
+
+    // --- Click on scrollbar track to jump ---
+    track.addEventListener('click', (e) => {
+        if (e.target === thumb || e.target.closest('.hourly-forecast__scrollbar-thumb')) return;
+        const rect = track.getBoundingClientRect();
+        const clickRatio = (e.clientX - rect.left) / rect.width;
+        const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+        scrollContainer.scrollTo({
+            left: clickRatio * maxScroll,
+            behavior: 'smooth'
+        });
+    }, { signal });
+
+    // --- Click card to center it ---
+    scrollContainer.querySelectorAll('.hourly-card').forEach(card => {
+        card.addEventListener('click', () => {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }, { signal });
+    });
+
+    // --- Nav buttons ---
+    function scrollByCard(direction) {
+        const firstCard = scrollContainer.querySelector('.hourly-card');
+        if (!firstCard) return;
+        const gap = parseInt(getComputedStyle(scrollContainer).gap) || 0;
+        const cardWidth = firstCard.offsetWidth + gap;
+        const amount = direction === 'next' ? cardWidth : -cardWidth;
+        scrollContainer.scrollBy({
+            left: amount,
+            behavior: 'smooth'
+        });
+    }
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => scrollByCard('prev'), { signal });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => scrollByCard('next'), { signal });
+    }
+
+    // --- Keyboard arrow navigation ---
+    scrollContainer.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            scrollByCard('prev');
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            scrollByCard('next');
+        }
+    }, { signal });
 }
 
 // ============================================
