@@ -21,6 +21,12 @@
 </head>
 <body>
 
+    <!-- Skip to main content (keyboard navigation) -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- ARIA live region for screen reader announcements (visually hidden) -->
+    <div id="announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
     <!-- ==================== HEADER ==================== -->
     <header class="header" role="banner">
         <div class="container header__inner">
@@ -55,7 +61,7 @@
     </header>
 
     <!-- ==================== MAIN CONTENT ==================== -->
-    <main class="main" role="main">
+    <main class="main" id="main-content" role="main" tabindex="-1">
         <div class="container">
 
             <!-- Search Section -->
@@ -107,7 +113,7 @@
             </div>
 
             <!-- Weather Display (hidden until search) -->
-            <div id="weather-display" class="weather-display" hidden>
+            <div id="weather-display" class="weather-display" tabindex="-1" hidden>
 
                 <!-- Current Weather -->
                 <section id="current-weather" class="current-weather" aria-label="Current weather">

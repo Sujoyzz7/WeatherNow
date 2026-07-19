@@ -45,6 +45,28 @@ let currentForecastData = null;
 let currentHourlyData = null;
 
 // ============================================
+// SCREEN READER ANNOUNCEMENTS
+// ============================================
+
+/**
+ * Pushes a message to the ARIA live region so screen readers announce it.
+ * Clears and re-sets the text to ensure announcements fire even for the same message.
+ * @param {string} message - Text to announce
+ * @param {string} [urgency='polite'] - 'polite' or 'assertive'
+ */
+function speak(message, urgency = 'polite') {
+    const el = document.getElementById('announcements');
+    if (!el) return;
+    // Clear first, then set, so duplicate messages still trigger announcement
+    el.textContent = '';
+    // Use a microtask to ensure the clear takes effect before the new message
+    requestAnimationFrame(() => {
+        el.setAttribute('aria-live', urgency);
+        el.textContent = message;
+    });
+}
+
+// ============================================
 // LOADING STATE
 // ============================================
 
@@ -55,9 +77,16 @@ let currentHourlyData = null;
 function showLoading() {
     const { loading, weatherDisplay, emptyState, errorMessage } = UI.elements;
 
+    // Ensure loading region has role=status for screen readers
+    loading.setAttribute('role', 'status');
+    loading.setAttribute('aria-live', 'polite');
+
     hideError();
     emptyState.hidden = true;
     weatherDisplay.hidden = true;
+
+    // Announce loading to screen readers
+    speak('Loading weather data...', 'polite');
 
     // Render rich skeleton placeholders that match real content layout
     loading.innerHTML = `
@@ -133,6 +162,8 @@ function hideLoading() {
 
 /**
  * Displays an error message to the user.
+ * The error element already has role="alert" + aria-live="polite" in HTML,
+ * so screen readers announce it automatically.
  * @param {string} message - Error message to display
  */
 function showError(message) {
@@ -194,10 +225,14 @@ function renderWeatherData(weatherData, unit) {
     // Show the weather display with animation
     weatherDisplay.hidden = false;
 
-    // Scroll to weather display smoothly
+    // Scroll to weather display smoothly, then move focus for screen readers
     setTimeout(() => {
         weatherDisplay.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Move focus to the weather display for keyboard/screen reader users
+        weatherDisplay.focus({ preventScroll: true });
     }, 100);
+
+    // Announce the weather data to screen readers (via live region in app.js)
 }
 
 // ============================================
@@ -323,6 +358,9 @@ function renderCurrentWeather(data, unit) {
     // Add event listener to the unit toggle button inside current weather
     const unitToggleBtn = document.getElementById('unit-toggle-btn');
     if (unitToggleBtn) {
+        // Update aria-label to reflect current unit
+        const otherUnit = unit === 'F' ? 'Celsius' : 'Fahrenheit';
+        unitToggleBtn.setAttribute('aria-label', `Switch to ${otherUnit}`);
         unitToggleBtn.addEventListener('click', () => {
             // Dispatch a custom event that app.js listens to
             document.dispatchEvent(new CustomEvent('toggle-unit'));
@@ -348,26 +386,29 @@ function renderHourlyForecast(data, unit) {
         return;
     }
 
-    const cardsHtml = data.map(hour => {
+    // Build hourly cards with roving tabindex for keyboard navigation
+    const cardsHtml = data.map((hour, index) => {
         const temp = unit === 'F' ? celsiusToFahrenheit(hour.temp) : hour.temp;
+        const tabIndex = index === 0 ? '0' : '-1';
         return `
-            <div class="hourly-card">
+            <button class="hourly-card" role="option" aria-selected="${index === 0}" tabindex="${tabIndex}" data-index="${index}" type="button" aria-label="${hour.time}, ${escapeHtml(hour.condition)}, ${temp}${unitSymbol}">
                 <span class="hourly-card__time">${hour.time}</span>
                 <img
                     class="hourly-card__icon"
                     src="${hour.iconUrl}"
-                    alt="${escapeHtml(hour.condition)}"
+                    alt=""
+                    aria-hidden="true"
                     width="40"
                     height="40"
                     loading="lazy"
                 >
                 <span class="hourly-card__temp">${temp}${unitSymbol}</span>
-            </div>
+            </button>
         `;
     }).join('');
 
     hourlyForecast.innerHTML = `
-        <div class="section-title">Hourly Forecast</div>
+        <div class="section-title" id="hourly-title">Hourly Forecast</div>
         <div class="hourly-forecast__scroll-wrapper">
             <button class="hourly-forecast__nav hourly-forecast__nav--prev" aria-label="Scroll hourly forecast left" title="Previous hours">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -379,7 +420,7 @@ function renderHourlyForecast(data, unit) {
                     <polyline points="9 18 15 12 9 6"/>
                 </svg>
             </button>
-            <div class="hourly-forecast__scroll" id="hourly-scroll" role="listbox" aria-label="Hourly forecast">
+            <div class="hourly-forecast__scroll" id="hourly-scroll" role="listbox" aria-label="Hourly forecast" aria-labelledby="hourly-title" tabindex="-1">
                 ${cardsHtml}
             </div>
             <div class="hourly-forecast__scrollbar" aria-hidden="true">
@@ -545,16 +586,52 @@ function initHourlyScroll() {
         });
     }, { signal });
 
-    // --- Click card to center it ---
-    scrollContainer.querySelectorAll('.hourly-card').forEach(card => {
+    // --- Card click & keyboard (roving tabindex) ---
+    const cards = [...scrollContainer.querySelectorAll('.hourly-card')];
+
+    function focusCard(index) {
+        cards.forEach((card, i) => {
+            const isActive = i === index;
+            card.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            card.tabIndex = isActive ? 0 : -1;
+        });
+        if (cards[index]) {
+            cards[index].focus({ preventScroll: true });
+            cards[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+
+    cards.forEach((card, i) => {
+        // Click to select & center
         card.addEventListener('click', () => {
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            focusCard(i);
+        }, { signal });
+
+        // Arrow keys within card
+        card.addEventListener('keydown', (e) => {
+            let newIndex = -1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                newIndex = Math.min(i + 1, cards.length - 1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                newIndex = Math.max(i - 1, 0);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                newIndex = 0;
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                newIndex = cards.length - 1;
+            }
+            if (newIndex >= 0 && newIndex !== i) {
+                focusCard(newIndex);
+            }
         }, { signal });
     });
 
     // --- Nav buttons ---
     function scrollByCard(direction) {
-        const firstCard = scrollContainer.querySelector('.hourly-card');
+        const firstCard = cards[0];
         if (!firstCard) return;
         const gap = parseInt(getComputedStyle(scrollContainer).gap) || 0;
         const cardWidth = firstCard.offsetWidth + gap;
@@ -571,17 +648,6 @@ function initHourlyScroll() {
     if (nextBtn) {
         nextBtn.addEventListener('click', () => scrollByCard('next'), { signal });
     }
-
-    // --- Keyboard arrow navigation ---
-    scrollContainer.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            scrollByCard('prev');
-        } else if (e.key === 'ArrowRight') {
-            e.preventDefault();
-            scrollByCard('next');
-        }
-    }, { signal });
 }
 
 // ============================================
@@ -762,10 +828,16 @@ function renderRecentSearches(searches) {
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
 
-    // Update the toggle button icon
+    // Update the toggle button icon and aria-label
     const themeIcon = document.querySelector('.theme-icon');
     if (themeIcon) {
         themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    const themeBtn = document.getElementById('theme-toggle');
+    if (themeBtn) {
+        const next = theme === 'dark' ? 'light' : 'dark';
+        themeBtn.setAttribute('aria-label', `Switch to ${next} mode`);
     }
 
     // Update the meta theme-color for mobile browsers

@@ -57,6 +57,9 @@ function initApp() {
 
     // Check for geolocation support (but don't auto-request)
     checkGeolocationSupport();
+
+    // Welcome announcement for screen reader users
+    speak('WeatherNow ready. Search for a city to see the weather forecast.', 'polite');
 }
 
 // ============================================
@@ -159,6 +162,12 @@ async function performSearch(city) {
         // Render the weather display
         renderWeatherData(weatherData, AppState.unit);
 
+        // Announce weather data to screen readers
+        const current = weatherData.current;
+        const tempStr = AppState.unit === 'F' ? celsiusToFahrenheit(current.temp) : current.temp;
+        const unitSymbol = AppState.unit === 'F' ? '°F' : '°C';
+        speak(`Weather for ${current.city}, ${current.country}: ${tempStr}${unitSymbol}, ${current.condition}. Humidity ${current.humidity}%. Wind ${current.windSpeed} kilometers per hour.`, 'polite');
+
     } catch (error) {
         console.error('Search error:', error);
         showError(error.message || 'Unable to fetch weather data. Please try again later.');
@@ -207,6 +216,12 @@ async function handleCurrentLocation() {
 
                 // Render
                 renderWeatherData(weatherData, AppState.unit);
+
+                // Announce
+                const curr = weatherData.current;
+                const t = AppState.unit === 'F' ? celsiusToFahrenheit(curr.temp) : curr.temp;
+                const sym = AppState.unit === 'F' ? '°F' : '°C';
+                speak(`Weather for your current location: ${t}${sym}, ${curr.condition}.`, 'polite');
 
             } catch (error) {
                 console.error('Location fetch error:', error);
@@ -275,6 +290,9 @@ function handleRecentSearchDelete(e) {
     // Remove the city from storage
     const updatedSearches = removeSearch(city);
     renderRecentSearches(updatedSearches);
+
+    // Announce removal
+    speak(`${city} removed from search history.`, 'polite');
 }
 
 /**
@@ -290,6 +308,9 @@ function handleClearAll(e) {
     // Clear all searches
     clearSearches();
     renderRecentSearches([]);
+
+    // Announce
+    speak('All search history cleared.', 'polite');
 }
 
 /**
@@ -298,6 +319,14 @@ function handleClearAll(e) {
 function handleThemeToggle() {
     const newTheme = toggleTheme();
     applyTheme(newTheme);
+    // Announce theme change
+    speak(`${newTheme === 'dark' ? 'Dark' : 'Light'} mode activated.`, 'polite');
+
+    // Update the toggle button aria-label
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+        btn.setAttribute('aria-label', `Switch to ${newTheme === 'dark' ? 'light' : 'dark'} mode`);
+    }
 }
 
 /**
@@ -308,6 +337,8 @@ function handleUnitToggle() {
     const newUnit = toggleUnit();
     AppState.unit = newUnit;
     rerenderWithUnit(newUnit);
+    // Announce unit change
+    speak(`Temperature switched to ${newUnit === 'F' ? 'Fahrenheit' : 'Celsius'}.`, 'polite');
 }
 
 // ============================================
