@@ -52,6 +52,9 @@ function initApp() {
     // Bind all event listeners
     bindEvents();
 
+    // Load version from version.txt
+    loadAppVersion();
+
     // Check for geolocation support (but don't auto-request)
     checkGeolocationSupport();
 }
@@ -305,6 +308,29 @@ function handleUnitToggle() {
     const newUnit = toggleUnit();
     AppState.unit = newUnit;
     rerenderWithUnit(newUnit);
+}
+
+// ============================================
+// VERSION MANAGEMENT
+// ============================================
+
+/**
+ * Fetches the app version from version.txt and displays it in the footer.
+ * Update version.txt to change the version number.
+ */
+async function loadAppVersion() {
+    const versionEl = document.getElementById('app-version');
+    if (!versionEl) return;
+
+    try {
+        const response = await fetch('version.txt');
+        if (response.ok) {
+            const version = (await response.text()).trim();
+            versionEl.textContent = version;
+        }
+    } catch (error) {
+        console.warn('Could not load version.txt:', error);
+    }
 }
 
 // ============================================
